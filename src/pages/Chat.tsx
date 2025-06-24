@@ -1,23 +1,48 @@
 import { useState } from "react";
+import axios from "axios";
 import { Link } from "react-router-dom";
 
 export default function Chat() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const sendMessage = () => {
-    const trimmed = input.trim();
-    if (!trimmed) return;
+  const sendMessage = async () => {
+    const userMsg = input.trim();
+    if (!userMsg) return;
 
-    const fakeReply = `AI: That's interesting! Tell me more about "${trimmed}".`;
-
-    setMessages([...messages, `You: ${trimmed}`, fakeReply]);
+    setMessages((prev) => [...prev, `You: ${userMsg}`]);
     setInput("");
+    setLoading(true);
+
+    try {
+      const res = await axios.post(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          model: "gpt-3.5-turbo",
+          messages: [{ role: "user", content: userMsg }],
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const reply = res.data.choices[0].message.content;
+      setMessages((prev) => [...prev, `AI: ${reply}`]);
+    } catch (err) {
+      console.error(err);
+      setMessages((prev) => [...prev, "AI: [Error getting response]"]);
+    }
+
+    setLoading(false);
   };
 
   return (
     <div style={{ padding: "2rem" }}>
-      <h2 style={{ marginBottom: "1rem" }}>🤖 Chat with AI</h2>
+      <h2>🤖 Chat with AI</h2>
 
       <div
         style={{
@@ -29,27 +54,27 @@ export default function Chat() {
           backgroundColor: "#f9f9f9",
         }}
       >
-        {messages.map((msg, idx) => (
-          <div key={idx} style={{ marginBottom: "0.5rem" }}>
-            {msg}
-          </div>
+        {messages.map((msg, i) => (
+          <div key={i} style={{ marginBottom: "0.5rem" }}>{msg}</div>
         ))}
       </div>
 
       <div style={{ display: "flex", gap: "0.5rem" }}>
         <input
           type="text"
-          placeholder="Type your question..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          style={{ flex: 1, padding: "0.5rem", fontSize: "1rem" }}
+          placeholder="Ask something..."
+          style={{ flex: 1, padding: "0.5rem" }}
         />
-        <button onClick={sendMessage}>Send</button>
+        <button onClick={sendMessage} disabled={loading}>
+          {loading ? "Sending..." : "Send"}
+        </button>
       </div>
 
-      <div style={{ marginTop: "1.5rem" }}>
+      <div style={{ marginTop: "1rem" }}>
         <Link to="/">
-          <button style={{ background: "#eee", padding: "0.5rem 1rem", border: "1px solid #aaa" }}>
+          <button style={{ padding: "0.5rem 1rem", border: "1px solid #aaa" }}>
             ← Back to Dashboard
           </button>
         </Link>
